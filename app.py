@@ -40,35 +40,41 @@ total_artists = total_albums = total_tracks = total_stream_count = total_ms_play
 
 for line in total_streaming_history:
     artist = line['master_metadata_album_artist_name']
-    database_artist = cursor.execute("SELECT name FROM artists WHERE name IS ?", (artist, )).fetchone()
+    if not artist and line['episode_name']:
+        continue
+    database_artist = cursor.execute("SELECT id, name FROM artists WHERE name IS ?", (artist, )).fetchone()
     if database_artist is None:
         # print("New Artist", artist)
         total_artists += 1
         cursor.execute("INSERT INTO artists (name) VALUES (?)", (artist,))
+        database_artist = cursor.execute("SELECT id, name FROM artists WHERE name IS ?", (artist, )).fetchone()
+    artist_id = database_artist[0]
 
     album = line['master_metadata_album_album_name']
-    database_album = cursor.execute("SELECT name FROM albums WHERE name IS ?", (album, )).fetchone()
+    database_album = cursor.execute("SELECT id,name FROM albums WHERE name IS ?", (album, )).fetchone()
     if database_album is None:
-        artist_id = cursor.execute("SELECT id FROM artists WHERE name IS ?", (artist, )).fetchone()[0]
         # print("New Album", album)
         total_albums += 1
         cursor.execute("INSERT INTO albums (name, artist_id) VALUES (?, ?)", (album, artist_id,))
+        database_album = cursor.execute("SELECT id,name FROM albums WHERE name IS ?", (album, )).fetchone()
+    album_id = database_album[0]
 
     track = line['master_metadata_track_name']
     try:
         uri = line['spotify_track_uri'].split(':')[2]
     except AttributeError:
         uri = "None"
-    database_track = cursor.execute("SELECT name FROM tracks WHERE name IS ?", (track, )).fetchone()
+    database_track = cursor.execute("SELECT id, name FROM tracks WHERE name IS ? AND artist_id IS ? AND album_id IS ?", (track, artist_id, album_id)).fetchone()
     if database_track is None:
-        album_id, artist_id = cursor.execute("SELECT id, artist_id FROM albums WHERE name IS ?", (album, )).fetchone()
         # print("New Track", track)
         total_tracks += 1
         cursor.execute("INSERT INTO tracks (name, album_id, artist_id,  spotify_uri) VALUES (?, ?, ?, ?)", (track, album_id, artist_id, uri,))
+        database_track = cursor.execute("SELECT id, name FROM tracks WHERE name IS ?", (track, )).fetchone()
+    track_id = database_track[0]
 
     timestamp = line['ts']
     ms_played = line['ms_played']
-    track_id, album_id, artist_id,  track_stream_count, track_ms_played = cursor.execute("SELECT id, album_id, artist_id, stream_count, ms_played FROM tracks WHERE name IS ?", (track, )).fetchone()
+    track_stream_count, track_ms_played = cursor.execute("SELECT stream_count, ms_played FROM tracks WHERE id IS ?", (track_id, )).fetchone()
     album_stream_count, album_ms_played = cursor.execute("SELECT stream_count, ms_played FROM albums WHERE id IS ?", (album_id, )).fetchone()
     artist_stream_count, artist_ms_played = cursor.execute("SELECT stream_count, ms_played FROM artists WHERE id IS ?", (artist_id, )).fetchone()
     if ms_played >= 30000:

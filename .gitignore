@@ -1,0 +1,5 @@
+extended_streaming_history/*
+__pycache__/*
+*.json
+*.sqlite
+secret.py

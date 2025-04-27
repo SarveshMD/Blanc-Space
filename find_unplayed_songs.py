@@ -19,7 +19,16 @@ def get_artist(query):
         "limit": 1
     }
     response = requests.get(search_endpoint_url, headers=headers, params=params)
-    results = json.loads(response.text)["artists"]["items"][0]
+    results = json.loads(response.text)
+    try:
+        if results["error"]["status"] == 401:
+            print("Access Token Expired, Rotating...")
+            import update_access_token
+            response = requests.get(search_endpoint_url, headers=headers, params=params)
+            results = json.loads(response.text)
+    except KeyError:
+        pass
+    results = results["artists"]["items"][0]
     return {
         "name": results["name"],
         "id": results["uri"].split(":")[-1],
@@ -66,8 +75,8 @@ def ignore(name):
     return False
 
 
-def refresh_all_tracks():
-    artist = get_artist("Taylor")
+def refresh_all_tracks(artist_name):
+    artist = get_artist(artist_name)
     albums = request_albums(artist["id"])
     all_tracks = []
     for album in albums:
@@ -86,14 +95,18 @@ def refresh_all_tracks():
         file.write(json.dumps(all_tracks, indent=4))
     return all_tracks
 
-# all_tracks = refresh_all_tracks()
-with open("tracks.json") as file:
-    all_tracks = json.loads(file.read())
+artist_name = input("Enter Artist Name: ")
+if artist_name:
+    all_tracks = refresh_all_tracks(artist_name)
+else:
+    with open("tracks.json") as file:
+        all_tracks = json.loads(file.read())
 
 conn = sqlite3.connect("data.sqlite")
 cursor = conn.cursor()
 
+print("\n -- Unplayed Songs --\n")
 for track in all_tracks:
     search_db = cursor.execute("SELECT name FROM tracks WHERE name IS ?", (track, )).fetchall()
     if not search_db:
-        print(track)
+        print(f"  - {track}")

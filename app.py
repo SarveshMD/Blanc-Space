@@ -27,7 +27,8 @@ for item in ls:
         print(f"  - {path}")
         files.append(path)
 
-files = ["extended_streaming_history/sample.json"]
+if input("\nSample Data? "):
+    files = ["extended_streaming_history/sample.json"]
 
 total_streaming_history = []
 for file in files:
